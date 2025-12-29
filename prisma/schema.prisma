@@ -1,0 +1,144 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String       @id @default(cuid())
+  email         String       @unique
+  password      String
+  name          String?
+  avatarUrl     String?
+  emailVerified Boolean      @default(false)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  sessions      Session[]
+  tokens        Token[]
+  apps          Application[]
+  accountLogs   AccountLog[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}
+
+model Token {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  type      String   // 'EMAIL_VERIFICATION', 'PASSWORD_RESET'
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}
+
+model Application {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  ownerId   String
+  secret    String   @default(uuid())
+  version   String   @default("1.0")
+  status    String   @default("active")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  licenses License[]
+  appUsers AppUser[]
+
+  @@index([userId])
+}
+
+model AccountLog {
+  id        String   @id @default(cuid())
+  userId    String
+  ip        String
+  userAgent String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model License {
+  id          String      @id @default(cuid())
+  applicationId String
+  key         String      @unique
+  level       Int         @default(1)
+  duration    Int         // Duration in seconds
+  expiry      DateTime?
+  note        String?
+  used        Boolean     @default(false)
+  usedBy      String?     // User identifier who used it
+  usedOn      DateTime?
+  banned      Boolean     @default(false)
+  banReason   String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  application Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@index([key])
+  @@index([used])
+  @@index([banned])
+}
+
+model AppUser {
+  id            String      @id @default(cuid())
+  applicationId String
+  username      String
+  password      String      // Hashed password
+  email         String?
+  hwid          String?
+  ip            String?
+  subscription  String      @default("default")
+  expiry        DateTime?
+  banned        Boolean     @default(false)
+  banReason     String?
+  paused        Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  lastLogin     DateTime?
+  application   Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  userVars      UserVar[]
+
+  @@index([applicationId])
+  @@index([username])
+  @@index([banned])
+  @@index([paused])
+  @@unique([applicationId, username])
+}
+
+model UserVar {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  value     String
+  readOnly  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@unique([userId, name])
+}
+

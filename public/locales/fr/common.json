@@ -1,0 +1,27 @@
+{
+  "auth": {
+    "login": "Se Connecter",
+    "register": "S'inscrire",
+    "logout": "Se Déconnecter",
+    "email": "E-mail",
+    "password": "Mot de Passe",
+    "name": "Nom",
+    "createAccount": "Créer un Compte",
+    "welcomeBack": "Bon retour! Veuillez vous connecter à votre compte.",
+    "joinUs": "Rejoignez-nous! Créez votre compte pour commencer.",
+    "alreadyHaveAccount": "Vous avez déjà un compte?",
+    "dontHaveAccount": "Vous n'avez pas de compte?",
+    "signIn": "Se connecter",
+    "signUp": "S'inscrire"
+  },
+  "dashboard": {
+    "title": "Tableau de Bord",
+    "welcome": "Bon retour",
+    "userInfo": "Informations Utilisateur",
+    "emailVerified": "E-mail Vérifié",
+    "quickActions": "Actions Rapides",
+    "profileSettings": "Paramètres du Profil",
+    "security": "Sécurité"
+  }
+}
+

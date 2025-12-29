@@ -1,0 +1,469 @@
+'use client'
+
+import { useState, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
+import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
+import { Select } from '@/components/ui/Select'
+import { useToast } from '@/components/ui/Toast'
+
+interface Log {
+  id: string
+  logDate: Date
+  logData: string
+  credential: string
+  deviceName: string
+  createdAt: Date
+}
+
+interface LogsContentProps {
+  user: {
+    name?: string | null
+    email: string
+  }
+  apps: { id: string; name: string }[]
+  logs: Log[]
+  currentAppId: string | null
+}
+
+export const LogsContent: React.FC<LogsContentProps> = ({
+  user,
+  apps,
+  logs: initialLogs,
+  currentAppId,
+}) => {
+  const router = useRouter()
+  const { toast } = useToast()
+  const [logs, setLogs] = useState<Log[]>(initialLogs)
+  const [selectedAppId, setSelectedAppId] = useState<string | null>(currentAppId || apps[0]?.id || null)
+
+  // Table states
+  const [searchQuery, setSearchQuery] = useState('')
+  const [pageSize, setPageSize] = useState(10)
+  const [currentPage, setCurrentPage] = useState(1)
+
+  // Modals
+  const [showDeleteAllModal, setShowDeleteAllModal] = useState(false)
+
+  const currentApp = useMemo(() => {
+    return apps.find((a) => a.id === selectedAppId) || apps[0]
+  }, [apps, selectedAppId])
+
+  const handleAppChange = async (appId: string) => {
+    setSelectedAppId(appId)
+    try {
+      await fetch('/api/apps/select', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appId }),
+      })
+      router.push('/dashboard/logs')
+      router.refresh()
+    } catch (e: any) {
+      toast({
+        variant: 'error',
+        title: 'Failed to select app',
+        description: e?.message || 'Something went wrong while selecting your app.',
+      })
+    }
+  }
+
+  const handleExport = async () => {
+    if (!selectedAppId) return
+
+    try {
+      const res = await fetch(`/api/logs/export?appId=${selectedAppId}`, {
+        method: 'GET',
+      })
+
+      if (!res.ok) throw new Error('Failed to export logs')
+
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `logs-${new Date().toISOString()}.csv`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+
+      toast({
+        variant: 'success',
+        title: 'Logs exported',
+        description: 'The logs have been exported successfully.',
+      })
+    } catch (e: any) {
+      toast({
+        variant: 'error',
+        title: 'Failed to export logs',
+        description: e?.message || 'Something went wrong.',
+      })
+    }
+  }
+
+  const handleDeleteAll = async () => {
+    if (!selectedAppId) return
+
+    try {
+      const res = await fetch('/api/logs', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appId: selectedAppId,
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || 'Failed to delete logs')
+
+      toast({
+        variant: 'success',
+        title: 'Logs deleted',
+        description: 'All logs have been deleted successfully.',
+      })
+
+      setShowDeleteAllModal(false)
+      router.refresh()
+    } catch (e: any) {
+      toast({
+        variant: 'error',
+        title: 'Failed to delete logs',
+        description: e?.message || 'Something went wrong.',
+      })
+    }
+  }
+
+  const formatDate = (date: Date) => {
+    return new Date(date).toLocaleString()
+  }
+
+  // Filter and paginate logs
+  const filteredLogs = useMemo(() => {
+    let filtered = logs
+
+    if (searchQuery) {
+      filtered = filtered.filter(
+        (log) =>
+          log.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          log.logData.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          log.credential.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          log.deviceName.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    }
+
+    return filtered
+  }, [logs, searchQuery])
+
+  const paginatedLogs = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    const end = start + pageSize
+    return filteredLogs.slice(start, end)
+  }, [filteredLogs, currentPage, pageSize])
+
+  const totalPages = Math.ceil(filteredLogs.length / pageSize)
+
+  return (
+    <>
+      <div className="p-4 sm:p-6 lg:p-8 transition-all duration-200 lg:ml-72">
+        <div className="max-w-7xl mx-auto space-y-6">
+          {/* Breadcrumb */}
+          <div className="glass-card rounded-2xl p-4 sm:p-6 border border-black/5 dark:border-white/5">
+            <nav className="flex mb-4" aria-label="Breadcrumb">
+              <ol className="inline-flex items-center space-x-1 md:space-x-2">
+                <li className="inline-flex items-center">
+                  <a
+                    href="/dashboard"
+                    className="inline-flex items-center text-sm font-medium text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white"
+                  >
+                    <svg
+                      className="w-3 h-3 mr-2.5"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path d="m19.707 9.293-2-2-7-7a1 1 0 0 0-1.414 0l-7 7-2 2a1 1 0 0 0 1.414 1.414L2 10.414V18a2 2 0 0 0 2 2h3a1 1 0 0 0 1-1v-4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 0 1 1h3a2 2 0 0 0 2-2v-7.586l.293.293a1 1 0 0 0 1.414-1.414Z" />
+                    </svg>
+                    Dashboard
+                  </a>
+                </li>
+                <li>
+                  <div className="flex items-center">
+                    <span className="mx-2 text-black/40 dark:text-white/40">/</span>
+                    <span className="text-sm font-medium text-black/60 dark:text-white/60">
+                      Current App: {currentApp?.name || 'None'}
+                    </span>
+                  </div>
+                </li>
+              </ol>
+            </nav>
+
+            <h1 className="text-xl font-semibold text-black dark:text-white sm:text-2xl mb-2">
+              Application Logs
+            </h1>
+            <p className="text-xs text-black/60 dark:text-white/60">
+              Monitor the activity of your users on your application.{' '}
+              <a
+                href="https://keyauthdocs.apidog.io/dashboard/app/logs"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                Learn More
+              </a>
+            </p>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="glass-card rounded-2xl p-4 sm:p-6 border border-black/5 dark:border-white/5">
+            {/* Alert Box */}
+            <div className="flex items-center p-4 mb-4 text-amber-600 dark:text-amber-400 rounded-xl bg-amber-500/10 dark:bg-amber-500/10 border border-amber-500/30" role="alert">
+              <svg className="flex-shrink-0 w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM9.5 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM12 15H8a1 0 0 1 0-2h1v-3H8a1 0 0 1 0-2h2a1 0 0 1 1 1v4h1a1 0 0 1 0 2Z" />
+              </svg>
+              <div className="ml-3 text-sm font-medium">
+                The maximum log message length is 275 characters. Logs are automatically deleted after 1 month. If
+                you set Discord webhook at{' '}
+                <a href="/dashboard/app-settings" className="font-semibold underline hover:no-underline text-blue-600 dark:text-blue-400">
+                  /dashboard/app-settings
+                </a>
+                , logs will go to Discord and not display on our site.
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-3 mb-4">
+              <Button
+                variant="secondary"
+                onClick={handleExport}
+                className="flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Export Logs
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setShowDeleteAllModal(true)}
+                className="flex items-center gap-2 !bg-red-500/10 hover:!bg-red-500/20 !text-red-600 dark:!text-red-400 !border-red-500/30"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Delete All Logs
+              </Button>
+            </div>
+
+            {/* Search and Pagination Controls */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-black/70 dark:text-white/70">Show</label>
+                <Select
+                  value={String(pageSize)}
+                  onChange={(value) => {
+                    setPageSize(Number(value))
+                    setCurrentPage(1)
+                  }}
+                  className="w-20"
+                >
+                  <option value="10">10</option>
+                  <option value="25">25</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-black/70 dark:text-white/70">Search:</label>
+                <Input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value)
+                    setCurrentPage(1)
+                  }}
+                  placeholder="Search logs..."
+                  className="w-48"
+                />
+              </div>
+            </div>
+
+            {/* Logs Table */}
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm text-left">
+                <thead>
+                  <tr className="border-b border-black/10 dark:border-white/10">
+                    <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-black/70 dark:text-white/70">
+                      Log Date
+                    </th>
+                    <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-black/70 dark:text-white/70">
+                      Log Data
+                    </th>
+                    <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-black/70 dark:text-white/70">
+                      Credential
+                    </th>
+                    <th className="px-4 py-3 text-xs font-bold uppercase tracking-wider text-black/70 dark:text-white/70">
+                      Device Name
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-black/5 dark:divide-white/5">
+                  {paginatedLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-8 text-center text-black/60 dark:text-white/60">
+                        No logs found.
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedLogs.map((log) => (
+                      <tr
+                        key={log.id}
+                        className="hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                      >
+                        <td className="px-4 py-3 text-black/70 dark:text-white/70">
+                          {formatDate(log.logDate)}
+                        </td>
+                        <td className="px-4 py-3 text-black/70 dark:text-white/70 max-w-md truncate">
+                          {log.logData}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs text-black/70 dark:text-white/70">
+                          {log.credential}
+                        </td>
+                        <td className="px-4 py-3 text-black/70 dark:text-white/70">
+                          {log.deviceName}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4">
+                <div className="text-sm text-black/60 dark:text-white/60">
+                  Showing {filteredLogs.length === 0 ? 0 : (currentPage - 1) * pageSize + 1} to{' '}
+                  {Math.min(currentPage * pageSize, filteredLogs.length)} of {filteredLogs.length} records
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-2 glass-input border border-black/20 dark:border-white/20 rounded-lg text-sm font-medium text-black dark:text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/80 dark:hover:bg-white/10 transition-colors"
+                    type="button"
+                  >
+                    Previous
+                  </button>
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum
+                    if (totalPages <= 5) {
+                      pageNum = i + 1
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i
+                    } else {
+                      pageNum = currentPage - 2 + i
+                    }
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`px-3 py-2 glass-input border rounded-lg text-sm font-medium transition-colors ${
+                          currentPage === pageNum
+                            ? 'bg-black/10 dark:bg-white/10 border-black/30 dark:border-white/30 text-black dark:text-white'
+                            : 'border-black/20 dark:border-white/20 text-black/70 dark:text-white/70 hover:bg-white/80 dark:hover:bg-white/10'
+                        }`}
+                        type="button"
+                      >
+                        {pageNum}
+                      </button>
+                    )
+                  })}
+                  <button
+                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-2 glass-input border border-black/20 dark:border-white/20 rounded-lg text-sm font-medium text-black dark:text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/80 dark:hover:bg-white/10 transition-colors"
+                    type="button"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Delete All Logs Modal */}
+      <DeleteModal
+        open={showDeleteAllModal}
+        onClose={() => setShowDeleteAllModal(false)}
+        onConfirm={handleDeleteAll}
+        loading={false}
+        title="Delete All Logs"
+        message="Are you sure you want to delete all of your logs? This cannot be undone."
+      />
+    </>
+  )
+}
+
+// Modal Components
+const Modal: React.FC<{
+  open: boolean
+  onClose: () => void
+  title: string
+  children: React.ReactNode
+}> = ({ open, onClose, title, children }) => {
+  if (!open) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-fade-in">
+      <div className="glass-card no-hover border border-black/20 dark:border-white/20 rounded-2xl shadow-2xl w-full max-w-md animate-scale-in">
+        <div className="px-6 py-5 border-b border-black/10 dark:border-white/10 flex items-center justify-between bg-gradient-to-r from-transparent via-black/5 to-transparent dark:via-white/5">
+          <h3 className="text-lg font-bold text-black dark:text-white">{title}</h3>
+          <button
+            onClick={onClose}
+            className="text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white hover:bg-black/10 dark:hover:bg-white/10 text-lg px-3 py-1.5 rounded-lg transition-all duration-200 hover:scale-110"
+            type="button"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="p-6 space-y-4">{children}</div>
+      </div>
+    </div>
+  )
+}
+
+const DeleteModal: React.FC<{
+  open: boolean
+  onClose: () => void
+  onConfirm: () => void
+  loading: boolean
+  title: string
+  message: string
+}> = ({ open, onClose, onConfirm, loading, title, message }) => (
+  <Modal open={open} onClose={onClose} title={title}>
+    <div className="rounded-xl border-2 border-red-500/50 bg-gradient-to-r from-red-500/10 to-red-600/10 dark:from-red-900/30 dark:to-red-800/30 text-red-700 dark:text-red-400 text-sm p-4 flex items-start gap-3">
+      <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+      <div>
+        <p className="font-semibold mb-1">Warning: This action cannot be undone</p>
+        <p className="text-xs opacity-90">{message}</p>
+      </div>
+    </div>
+    <div className="flex justify-end gap-3 pt-2">
+      <Button variant="secondary" onClick={onClose} type="button">
+        Cancel
+      </Button>
+      <Button
+        onClick={onConfirm}
+        isLoading={loading}
+        className="!bg-red-600 hover:!bg-red-700 dark:!bg-red-600 dark:hover:!bg-red-700 text-white border-red-600"
+      >
+        Yes, I'm sure
+      </Button>
+    </div>
+  </Modal>
+)
+

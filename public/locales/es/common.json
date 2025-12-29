@@ -1,0 +1,27 @@
+{
+  "auth": {
+    "login": "Iniciar Sesión",
+    "register": "Registrarse",
+    "logout": "Cerrar Sesión",
+    "email": "Correo Electrónico",
+    "password": "Contraseña",
+    "name": "Nombre",
+    "createAccount": "Crear Cuenta",
+    "welcomeBack": "¡Bienvenido de nuevo! Por favor inicia sesión en tu cuenta.",
+    "joinUs": "¡Únete a nosotros! Crea tu cuenta para comenzar.",
+    "alreadyHaveAccount": "¿Ya tienes una cuenta?",
+    "dontHaveAccount": "¿No tienes una cuenta?",
+    "signIn": "Iniciar sesión",
+    "signUp": "Registrarse"
+  },
+  "dashboard": {
+    "title": "Panel de Control",
+    "welcome": "Bienvenido de nuevo",
+    "userInfo": "Información del Usuario",
+    "emailVerified": "Correo Verificado",
+    "quickActions": "Acciones Rápidas",
+    "profileSettings": "Configuración del Perfil",
+    "security": "Seguridad"
+  }
+}
+
